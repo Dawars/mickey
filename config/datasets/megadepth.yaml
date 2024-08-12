@@ -1,0 +1,8 @@
+DATASET:
+  DATA_SOURCE: 'MegaDepth'
+  DATA_ROOT: 'datasets.epfl.ch/disk-data/'
+  SCENES: None  # should be a list [] or None. If none, use all scenes.
+  AUGMENTATION_TYPE: None
+  HEIGHT: 720
+  WIDTH: 540
+  SEED: 66
