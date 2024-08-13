@@ -53,20 +53,14 @@ class MegaDepthScene(data.Dataset):
         poses = {}
         for img_name in self.image_names:
             calib_file = scene_root / "calibration" / f"calibration_{img_name}.h5"
-            filename = calib_file.name
-            print(img_name)
+            # print(img_name)
             # add suffix again if missing
             image = Image.open((scene_root / "images" / img_name).with_suffix(".jpg"))
             W, H = image.size
 
             K, R, T = MegaDepthScene.get_KRT(calib_file)
-            # fx, fy, cx, cy, W, H = map(float, values)
-
-            # qt = np.array(list(map(float, line[1:])))
             poses[img_name] = (mat2quat(R).astype(np.float32), T.astype(np.float32))
 
-            # K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
-            # K = np.array(K, dtype=np.float32)
             K = K.astype(np.float32)
             K_ori[img_name] = K
             if resize is not None:
@@ -89,28 +83,9 @@ class MegaDepthScene(data.Dataset):
 
         return pairs
 
-    # def load_pairs_overlap(self, overlap_limits: tuple = None, sample_factor: int = 1):
-    #     image_names = self.metadata[self.scene_id]
-    #     pairs = self.metadata[self.scene_id]
-    #
-    #     if overlaps_path.exists():
-    #         f = np.load(overlaps_path, allow_pickle=True)
-    #         idxs, overlaps = f['idxs'], f['overlaps']
-    #         if overlap_limits is not None:
-    #             min_overlap, max_overlap = overlap_limits
-    #             mask = (overlaps > min_overlap) * (overlaps < max_overlap)
-    #             idxs = idxs[mask]
-    #             return idxs.copy()
-    #     else:
-    #         idxs = np.zeros((len(self.poses) - 1, 4), dtype=np.uint16)
-    #         idxs[:, 2] = 1
-    #         idxs[:, 3] = np.array([int(fn[-9:-4])
-    #                               for fn in self.poses.keys() if 'seq0' not in fn], dtype=np.uint16)
-    #         return idxs[::sample_factor]
-
     def get_pair_path(self, pair):
         ids = pair
-        return (self.image_names[ids[0]], self.image_names[ids[1]])
+        return self.image_names[ids[0]], self.image_names[ids[1]]
 
     def __len__(self):
         return len(self.pairs)
@@ -191,7 +166,7 @@ class MegaDepthDataset(data.ConcatDataset):
         if scenes is None:
             # Locate all scenes of the current dataset
             scenes = [s.name for s in (data_path / "scenes").iterdir() if s.is_dir()]
-        print(scenes)
+        # print(scenes)
         if cfg.DEBUG:
             if mode == 'train':
                 scenes = scenes[:30]
