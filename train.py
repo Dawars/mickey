@@ -1,5 +1,7 @@
 import argparse
 import os
+import signal
+
 # do this before importing numpy! (doing it right up here in case numpy is dependency of e.g. json)
 os.environ["MKL_NUM_THREADS"] = "1"  # noqa: E402
 os.environ["NUMEXPR_NUM_THREADS"] = "1"  # noqa: E402
@@ -9,6 +11,7 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"  # noqa: E402
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.loggers import TensorBoardLogger
+from lightning.pytorch.plugins.environments import SLURMEnvironment
 
 from config.default import cfg
 from lib.datasets.datamodules import DataModuleTraining
@@ -65,7 +68,7 @@ def train_model(args):
                          logger=logger,
                          callbacks=[checkpoint_pose_callback, lr_monitoring_callback, epochend_callback, checkpoint_vcre_callback],
                          num_sanity_val_steps=0,
-                         gradient_clip_val=cfg.TRAINING.GRAD_CLIP)
+                         gradient_clip_val=cfg.TRAINING.GRAD_CLIP,plugins=SLURMEnvironment(requeue_signal=signal.SIGHUP))
 
     datamodule_end = DataModuleTraining(cfg)
     print('Training with {:.2f}/{:.2f} image overlap'.format(cfg.DATASET.MIN_OVERLAP_SCORE, cfg.DATASET.MAX_OVERLAP_SCORE))
