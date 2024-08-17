@@ -2,7 +2,7 @@
 
 import torch.utils as utils
 from torchvision.transforms import ColorJitter, Grayscale
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 from torch.utils.data import DataLoader
 

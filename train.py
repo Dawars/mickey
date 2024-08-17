@@ -8,9 +8,9 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"  # noqa: E402
 os.environ["OMP_NUM_THREADS"] = "1"  # noqa: E402
 os.environ["OPENBLAS_NUM_THREADS"] = "1"  # noqa: E402
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
-from pytorch_lightning.loggers import TensorBoardLogger
+from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
 from config.default import cfg

@@ -1,5 +1,5 @@
 import torch
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 from lib.models.MicKey.modules.loss.loss_class import MetricPoseLoss
 from lib.models.MicKey.modules.compute_correspondences import ComputeCorrespondences
