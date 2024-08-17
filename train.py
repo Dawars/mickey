@@ -34,7 +34,6 @@ def train_model(args):
 
     checkpoint_vcre_callback = pl.callbacks.ModelCheckpoint(
         filename='{epoch}-best_vcre',
-        save_last=True,
         save_top_k=1,
         verbose=True,
         monitor='val_vcre/auc_vcre',
@@ -43,7 +42,6 @@ def train_model(args):
 
     checkpoint_pose_callback = pl.callbacks.ModelCheckpoint(
         filename='{epoch}-best_pose',
-        save_last=True,
         save_top_k=1,
         verbose=True,
         monitor='val_AUC_pose/auc_pose',
@@ -51,14 +49,20 @@ def train_model(args):
     )
 
     epochend_callback = pl.callbacks.ModelCheckpoint(
-        filename='e{epoch}-last',
+        filename='{epoch}-last',
+        save_last=True,
         save_top_k=1,
         every_n_epochs=1,
         save_on_train_epoch_end=True
     )
 
     lr_monitoring_callback = pl.callbacks.LearningRateMonitor(logging_interval='step')
-    logger = TensorBoardLogger(save_dir=args.path_weights, name=exp_name)
+    jobId = os.getenv("SLURM_JOB_ID")
+    taskId = os.getenv('SLURM_ARRAY_JOB_ID')
+
+    job_id = int(taskId) if taskId else int(jobId)
+    print(job_id)
+    logger = TensorBoardLogger(save_dir=args.path_weights, name=exp_name, version=job_id)
 
     trainer = pl.Trainer(devices=cfg.TRAINING.NUM_GPUS,
                          log_every_n_steps=cfg.TRAINING.LOG_INTERVAL,
@@ -68,7 +72,9 @@ def train_model(args):
                          logger=logger,
                          callbacks=[checkpoint_pose_callback, lr_monitoring_callback, epochend_callback, checkpoint_vcre_callback],
                          num_sanity_val_steps=0,
-                         gradient_clip_val=cfg.TRAINING.GRAD_CLIP,plugins=SLURMEnvironment(requeue_signal=signal.SIGHUP))
+                         gradient_clip_val=cfg.TRAINING.GRAD_CLIP,
+                         plugins=SLURMEnvironment(requeue_signal=signal.SIGHUP, auto_requeue=False)
+                        )
 
     datamodule_end = DataModuleTraining(cfg)
     print('Training with {:.2f}/{:.2f} image overlap'.format(cfg.DATASET.MIN_OVERLAP_SCORE, cfg.DATASET.MAX_OVERLAP_SCORE))
