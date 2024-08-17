@@ -10,7 +10,7 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"  # noqa: E402
 
 import lightning.pytorch as pl
 import torch
-from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
 from config.default import cfg
@@ -62,7 +62,7 @@ def train_model(args):
 
     job_id = int(taskId) if taskId else int(jobId)
     print(job_id)
-    logger = TensorBoardLogger(save_dir=args.path_weights, name=exp_name, version=job_id)
+    logger = WandbLogger(project="mickey", save_dir=args.path_weights, name=exp_name, id=str(job_id), resume="allow")
 
     trainer = pl.Trainer(devices=cfg.TRAINING.NUM_GPUS,
                          log_every_n_steps=cfg.TRAINING.LOG_INTERVAL,
@@ -79,8 +79,8 @@ def train_model(args):
     datamodule_end = DataModuleTraining(cfg)
     print('Training with {:.2f}/{:.2f} image overlap'.format(cfg.DATASET.MIN_OVERLAP_SCORE, cfg.DATASET.MAX_OVERLAP_SCORE))
 
-    create_result_dir(logger.log_dir + '/config.yaml')
-    shutil.copyfile(args.config, logger.log_dir + '/config.yaml')
+    create_result_dir(logger._save_dir + '/config.yaml')
+    shutil.copyfile(args.config, logger._save_dir + '/config.yaml')
 
     if args.resume:
         ckpt_path = args.resume

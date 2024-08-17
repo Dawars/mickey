@@ -1,5 +1,6 @@
 import torch
 import lightning.pytorch as pl
+from lightning.pytorch.loggers import WandbLogger
 
 from lib.models.MicKey.modules.loss.loss_class import MetricPoseLoss
 from lib.models.MicKey.modules.compute_correspondences import ComputeCorrespondences
@@ -56,7 +57,7 @@ class MicKeyTrainingModel(pl.LightningModule):
         avg_loss, outputs, probs_grad, num_its = self.loss_fn(batch)
 
         training_step_ok = self.backward_step(batch, outputs, probs_grad, avg_loss, num_its)
-        self.tensorboard_log_step(batch, avg_loss, outputs, probs_grad, training_step_ok)
+        self.wandb_log_step(batch, avg_loss, outputs, probs_grad, training_step_ok)
 
     def on_train_epoch_end(self):
         if self.curriculum_learning:
@@ -187,6 +188,55 @@ class MicKeyTrainingModel(pl.LightningModule):
                     try:
                         im_rewards, rew_kp0, rew_kp1 = debug_reward_matches_log(batch, probs_grad, batch_i=batch_id)
                         tensorboard.add_image('training_rewards/pair0', im_rewards, global_step=self.log_im_counter_train)
+                    except ValueError:
+                        print('[WARNING]: Failed to log reward image. Selected image is not in topK image pairs. ')
+
+                self.log_im_counter_train += 1
+
+        torch.cuda.empty_cache()
+        self.counter_batch += 1
+
+    def wandb_log_step(self, batch, avg_loss, outputs, probs_grad, training_step_ok):
+
+        self.log('train/loss', avg_loss.detach())
+        self.log('train/loss_rot', outputs['avg_loss_rot'].detach())
+        self.log('train/loss_trans', outputs['avg_loss_trans'].detach())
+
+        if self.log_store_ims:
+            if self.counter_batch % self.log_interval == 0:
+                self.counter_batch = 0
+
+                # If training with curriculum learning, not all image pairs have valid gradients
+                # ensure selecting one image pair for logging that has reward information
+                batch_id = torch.where(outputs['mask_topk'] == 1.)[0][0].item()
+
+                # Metric pose evaluation
+                R_ours, t_m_ours, inliers_ours, inliers_list_ours = self.e2e_Procrustes.estimate_pose(batch, return_inliers=True)
+                outputs_metric_ours = pose_error_torch(R_ours, t_m_ours, batch['T_0to1'], reduce=None)
+                self.log('train_metric_pose/ours_t_err_ang', outputs_metric_ours['t_err_ang'].mean().detach())
+                self.log('train_metric_pose/ours_t_err_euc', outputs_metric_ours['t_err_euc'].mean().detach())
+                self.log('train_metric_pose/ours_R_err', outputs_metric_ours['R_err'].mean().detach())
+
+                outputs_vcre_ours = vcre_torch(R_ours, t_m_ours, batch['T_0to1'], batch['Kori_color0'], reduce=None)
+                self.log('train_vcre/repr_err', outputs_vcre_ours['repr_err'].mean().detach())
+
+                im_inliers = vis_inliers(inliers_list_ours, batch, batch_i=batch_id)
+
+                im_matches, sc_map0, sc_map1, depth_map0, depth_map1 = log_image_matches(self.compute_matches.matcher,
+                                                                                         batch, train_depth=True,
+                                                                                         batch_i=batch_id)
+                logger: WandbLogger = self.logger
+
+                logger.log_image(key='training_matching/best_inliers', images=[im_inliers], step=self.log_im_counter_train)
+                logger.log_image(key='training_matching/best_matches_desc', images=[im_matches], step=self.log_im_counter_train)
+                logger.log_image(key='training_scores/map0', images=[sc_map0], step=self.log_im_counter_train)
+                logger.log_image(key='training_scores/map1', images=[sc_map1], step=self.log_im_counter_train)
+                logger.log_image(key='training_depth/map0', images=[depth_map0[0]], step=self.log_im_counter_train)
+                logger.log_image(key='training_depth/map1', images=[depth_map1[0]], step=self.log_im_counter_train)
+                if training_step_ok:
+                    try:
+                        im_rewards, rew_kp0, rew_kp1 = debug_reward_matches_log(batch, probs_grad, batch_i=batch_id)
+                        logger.log_image(key='training_rewards/pair0', images=[im_rewards], step=self.log_im_counter_train)
                     except ValueError:
                         print('[WARNING]: Failed to log reward image. Selected image is not in topK image pairs. ')
 
