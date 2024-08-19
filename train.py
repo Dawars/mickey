@@ -22,8 +22,8 @@ from lib.models.MicKey.modules.utils.training_utils import create_exp_name, crea
 import random
 import shutil
 
-def train_model(args):
 
+def train_model(args):
     cfg.merge_from_file(args.dataset_config)
     cfg.merge_from_file(args.config)
 
@@ -34,7 +34,13 @@ def train_model(args):
 
     model = MicKeyTrainingModel(cfg)
 
+    jobId = os.getenv("SLURM_JOB_ID")
+    taskId = os.getenv('SLURM_ARRAY_JOB_ID')
+    job_id = int(taskId) if taskId else int(jobId)
+    ckpt_dir = os.path.join(args.path_weights, exp_name, str(job_id))
+
     checkpoint_vcre_callback = pl.callbacks.ModelCheckpoint(
+        dirpath=ckpt_dir,
         filename='{epoch}-best_vcre',
         save_top_k=1,
         verbose=True,
@@ -43,6 +49,7 @@ def train_model(args):
     )
 
     checkpoint_pose_callback = pl.callbacks.ModelCheckpoint(
+        dirpath=ckpt_dir,
         filename='{epoch}-best_pose',
         save_top_k=1,
         verbose=True,
@@ -51,6 +58,7 @@ def train_model(args):
     )
 
     epochend_callback = pl.callbacks.ModelCheckpoint(
+        dirpath=ckpt_dir,
         filename='{epoch}-last',
         save_last=True,
         save_top_k=1,
@@ -59,12 +67,16 @@ def train_model(args):
     )
 
     lr_monitoring_callback = pl.callbacks.LearningRateMonitor(logging_interval='step')
-    jobId = os.getenv("SLURM_JOB_ID")
-    taskId = os.getenv('SLURM_ARRAY_JOB_ID')
 
-    job_id = int(taskId) if taskId else int(jobId)
-    print(job_id)
-    logger = WandbLogger(project="mickey", save_dir=args.path_weights, name=exp_name, id=str(job_id), resume="allow")
+    create_result_dir(os.path.join(ckpt_dir, 'config.yaml'))
+    shutil.copyfile(args.config, os.path.join(ckpt_dir, 'config.yaml'))
+
+    config_dictionary = dict(
+        yaml=cfg,
+    )
+
+    logger = WandbLogger(project="mickey", name=exp_name, id=str(job_id), resume="allow",
+                         config=config_dictionary)
 
     trainer = pl.Trainer(devices=cfg.TRAINING.NUM_GPUS,
                          log_every_n_steps=cfg.TRAINING.LOG_INTERVAL,
@@ -78,14 +90,13 @@ def train_model(args):
                                     ],
                          num_sanity_val_steps=0,
                          gradient_clip_val=cfg.TRAINING.GRAD_CLIP,
-                         plugins=SLURMEnvironment(requeue_signal=signal.SIGHUP, auto_requeue=False)
-                        )
+                         plugins=SLURMEnvironment(requeue_signal=signal.SIGHUP, auto_requeue=False),
+                         enable_progress_bar=False,
+                         )
 
     datamodule_end = DataModuleTraining(cfg)
-    print('Training with {:.2f}/{:.2f} image overlap'.format(cfg.DATASET.MIN_OVERLAP_SCORE, cfg.DATASET.MAX_OVERLAP_SCORE))
-
-    create_result_dir(logger._save_dir + '/config.yaml')
-    shutil.copyfile(args.config, logger._save_dir + '/config.yaml')
+    print('Training with {:.2f}/{:.2f} image overlap'.format(cfg.DATASET.MIN_OVERLAP_SCORE,
+                                                             cfg.DATASET.MAX_OVERLAP_SCORE))
 
     if args.resume:
         ckpt_path = args.resume
@@ -93,6 +104,7 @@ def train_model(args):
         ckpt_path = None
 
     trainer.fit(model, datamodule_end, ckpt_path=ckpt_path)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
