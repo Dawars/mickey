@@ -15,6 +15,7 @@ class DataModule(pl.LightningDataModule):
     def __init__(self, cfg, drop_last_val=True):
         super().__init__()
         self.cfg = cfg
+        self.batch_size = self.cfg.TRAINING.BATCH_SIZE
         self.drop_last_val = drop_last_val
 
         datasets = {'MapFree': MapFreeDataset, 'MegaDepth': MegaDepthDataset}
@@ -43,7 +44,7 @@ class DataModule(pl.LightningDataModule):
         sampler = self.get_sampler(dataset)
 
         dataloader = utils.data.DataLoader(dataset,
-                                           batch_size=self.cfg.TRAINING.BATCH_SIZE,
+                                           batch_size=self.batch_size,
                                            num_workers=self.cfg.TRAINING.NUM_WORKERS,
                                            sampler=sampler
                                            )
@@ -52,7 +53,7 @@ class DataModule(pl.LightningDataModule):
     def val_dataloader(self):
         dataset = self.dataset_type(self.cfg, 'val')
         dataloader = utils.data.DataLoader(dataset,
-                                           batch_size=self.cfg.TRAINING.BATCH_SIZE,
+                                           batch_size=self.batch_size,
                                            num_workers=self.cfg.TRAINING.NUM_WORKERS,
                                            sampler=None,
                                            drop_last=self.drop_last_val
@@ -62,7 +63,7 @@ class DataModule(pl.LightningDataModule):
     def test_dataloader(self):
         dataset = self.dataset_type(self.cfg, 'test')
         dataloader = utils.data.DataLoader(dataset,
-                                           batch_size=self.cfg.TRAINING.BATCH_SIZE,
+                                           batch_size=self.batch_size,
                                            num_workers=self.cfg.TRAINING.NUM_WORKERS,
                                            shuffle=False,
                                            drop_last=self.drop_last_val)
@@ -73,6 +74,7 @@ class DataModuleTraining(pl.LightningDataModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
+        self.batch_size = self.cfg.TRAINING.BATCH_SIZE
         self.seed = cfg.DATASET.SEED
 
         datasets = {'MapFree': MapFreeDataset, 'MegaDepth': MegaDepthDataset}
@@ -100,9 +102,9 @@ class DataModuleTraining(pl.LightningDataModule):
         dataset = self.dataset_type(self.cfg, 'train', transforms=transforms)
         sampler = self.get_sampler(dataset, seed=self.seed)
         dataloader = DataLoader(dataset,
-                                       batch_size=self.cfg.TRAINING.BATCH_SIZE,
-                                       num_workers=self.cfg.TRAINING.NUM_WORKERS,
-                                       sampler=sampler)
+                                batch_size=self.batch_size,
+                                num_workers=self.cfg.TRAINING.NUM_WORKERS,
+                                sampler=sampler)
         return dataloader
 
     def val_dataloader(self):
@@ -110,7 +112,7 @@ class DataModuleTraining(pl.LightningDataModule):
         sampler = self.get_sampler(dataset, reset_epoch=True)
         # sampler = None
         dataloader = DataLoader(dataset,
-                                   batch_size=self.cfg.TRAINING.BATCH_SIZE,
+                                   batch_size=self.batch_size,
                                    num_workers=self.cfg.TRAINING.NUM_WORKERS,
                                    sampler=sampler,
                                    drop_last=True)
@@ -119,7 +121,7 @@ class DataModuleTraining(pl.LightningDataModule):
     def test_dataloader(self):
         dataset = self.dataset_type(self.cfg, 'test')
         dataloader = DataLoader(dataset,
-                                       batch_size=self.cfg.TRAINING.BATCH_SIZE,
+                                       batch_size=self.batch_size,
                                        num_workers=self.cfg.TRAINING.NUM_WORKERS,
                                        shuffle=False)
         return dataloader

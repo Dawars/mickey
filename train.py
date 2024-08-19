@@ -2,6 +2,8 @@ import argparse
 import os
 import signal
 
+from lightning.pytorch.callbacks import BatchSizeFinder
+
 # do this before importing numpy! (doing it right up here in case numpy is dependency of e.g. json)
 os.environ["MKL_NUM_THREADS"] = "1"  # noqa: E402
 os.environ["NUMEXPR_NUM_THREADS"] = "1"  # noqa: E402
@@ -70,7 +72,10 @@ def train_model(args):
                          limit_val_batches=cfg.TRAINING.VAL_BATCHES,
                          max_epochs=cfg.TRAINING.EPOCHS,
                          logger=logger,
-                         callbacks=[checkpoint_pose_callback, lr_monitoring_callback, epochend_callback, checkpoint_vcre_callback],
+                         callbacks=[checkpoint_pose_callback, lr_monitoring_callback, epochend_callback,
+                                    checkpoint_vcre_callback,
+                                    # BatchSizeFinder()
+                                    ],
                          num_sanity_val_steps=0,
                          gradient_clip_val=cfg.TRAINING.GRAD_CLIP,
                          plugins=SLURMEnvironment(requeue_signal=signal.SIGHUP, auto_requeue=False)
